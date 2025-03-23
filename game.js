@@ -1,3 +1,9 @@
+/**
+ * Mission Game
+ * MIT License - Copyright (c) 2024 Gregory Finley
+ * A simple side-scrolling game about exploring California Missions
+ */
+
 const config = {
     type: Phaser.AUTO,
     scale: {
@@ -99,13 +105,13 @@ function preload() {
 
     this.textures.addCanvas('background', backgroundCanvas);
 
-    // Create the friar sprite
-    const friarData = [
+    // Create the friar sprites with direction-specific faces
+    const friarStandingRight = [
         '     HHH     ',  // Head
         '    HHHHH    ',
         '    FFFFF    ',  // Face
-        '    FEFEF    ',  // Eyes
-        '     FMF     ',  // Mouth
+        '    FEFEF    ',  // Eyes (centered)
+        '     FMF     ',  // Mouth (centered)
         '    BBBBB    ',  // Neck/shoulders
         '   BBBBBBB   ',  // Upper robe
         '  BBBBBBBBB  ',
@@ -115,16 +121,66 @@ function preload() {
         '  BBBBBBBBB  ',  // Lower robe
         '  BBBBBBBBB  ',
         '   BBBBBBB   ',
-        '   BB B BB   ',  // Feet
-        '   SS S SS   '   // Sandals
+        '    BB BB    ',  // Feet together
+        '    SS SS    '   // Sandals together
     ];
 
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = 13;
-    canvas.height = 16;
+    const friarStandingLeft = [
+        '     HHH     ',  // Head
+        '    HHHHH    ',
+        '    FFFFF    ',  // Face
+        '    FEFEF    ',  // Eyes (centered)
+        '     FMF     ',  // Mouth (centered)
+        '    BBBBB    ',  // Neck/shoulders
+        '   BBBBBBB   ',  // Upper robe
+        '  BBBBBBBBB  ',
+        ' BBBBBBBBBBB ',
+        ' BBBBTBTBBBB ',  // Rope belt (T)
+        ' BBBBBBBBBBB ',
+        '  BBBBBBBBB  ',  // Lower robe
+        '  BBBBBBBBB  ',
+        '   BBBBBBB   ',
+        '    BB BB    ',  // Feet together
+        '    SS SS    '   // Sandals together
+    ];
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const friarWalkingRight = [
+        '     HHH     ',  // Head
+        '    HHHHH    ',
+        '    FFFFF    ',  // Face
+        '    FEFEF    ',  // Eyes (centered)
+        '     FMF     ',  // Mouth (centered)
+        '    BBBBB    ',  // Neck/shoulders
+        '   BBBBBBB   ',  // Upper robe
+        '  BBBBBBBBB  ',
+        ' BBBBBBBBBBB ',
+        ' BBBBTBTBBBB ',  // Rope belt (T)
+        ' BBBBBBBBBBB ',
+        '  BBBBBBBBB  ',  // Lower robe
+        '  BBBBBBBBB  ',
+        '   BBBBBBB   ',
+        '     BB  BB  ',  // Right foot forward
+        '     SS  SS  '   // Right sandal forward
+    ];
+
+    const friarWalkingLeft = [
+        '     HHH     ',  // Head
+        '    HHHHH    ',
+        '    FFFFF    ',  // Face
+        '    FEFEF    ',  // Eyes (centered)
+        '     FMF     ',  // Mouth (centered)
+        '    BBBBB    ',  // Neck/shoulders
+        '   BBBBBBB   ',  // Upper robe
+        '  BBBBBBBBB  ',
+        ' BBBBBBBBBBB ',
+        ' BBBBTBTBBBB ',  // Rope belt (T)
+        ' BBBBBBBBBBB ',
+        '  BBBBBBBBB  ',  // Lower robe
+        '  BBBBBBBBB  ',
+        '   BBBBBBB   ',
+        '  BB  BB     ',  // Left foot forward
+        '  SS  SS     '   // Left sandal forward
+    ];
 
     const colors = {
         'B': '#4a3728', // Brown robe
@@ -136,28 +192,33 @@ function preload() {
         'S': '#8b7355'  // Sandals
     };
 
-    friarData.forEach((row, y) => {
-        row.split('').forEach((pixel, x) => {
-            if (pixel !== ' ') {
-                ctx.fillStyle = colors[pixel];
-                ctx.fillRect(x, y, 1, 1);
-            }
-        });
-    });
-
-    const base64 = canvas.toDataURL('image/png');
-    const key = 'friar';
-    
-    if (this.textures.exists(key)) {
-        this.textures.remove(key);
-    }
-    
-    const image = new Image();
-    image.src = base64;
-    
-    image.onload = () => {
-        this.textures.addImage(key, image);
+    // Create all four frames for animation
+    const frames = {
+        'stand-right': friarStandingRight,
+        'stand-left': friarStandingLeft,
+        'walk-right': friarWalkingRight,
+        'walk-left': friarWalkingLeft
     };
+
+    Object.entries(frames).forEach(([name, sprite]) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 13;
+        canvas.height = 16;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        sprite.forEach((row, y) => {
+            row.split('').forEach((pixel, x) => {
+                if (pixel !== ' ') {
+                    ctx.fillStyle = colors[pixel];
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            });
+        });
+
+        this.textures.addCanvas(`friar-${name}`, canvas);
+    });
 }
 
 function create() {
@@ -177,9 +238,9 @@ function create() {
     this.time.delayedCall(100, () => {
         // Create the friar sprite with physics
         this.player = this.physics.add.sprite(
-            100,  // Start more to the left
-            this.cameras.main.height - 100,  // Just above ground
-            'friar'
+            100,
+            this.cameras.main.height - 100,
+            'friar-stand-right'  // Start facing right
         );
         
         // Scale the sprite to be more visible
@@ -228,13 +289,19 @@ function update() {
     
     if (moveLeft) {
         this.player.setVelocityX(-speed);
-        this.player.setFlipX(true);
-        this.background.tilePositionX -= 2;  // Scroll background
+        this.background.tilePositionX -= 2;
+        // Use left-facing walking animation
+        this.player.setTexture(Math.floor(Date.now() / 150) % 2 === 0 ? 'friar-walk-left' : 'friar-stand-left');
     } else if (moveRight) {
         this.player.setVelocityX(speed);
-        this.player.setFlipX(false);
-        this.background.tilePositionX += 2;  // Scroll background
+        this.background.tilePositionX += 2;
+        // Use right-facing walking animation
+        this.player.setTexture(Math.floor(Date.now() / 150) % 2 === 0 ? 'friar-walk-right' : 'friar-stand-right');
     } else {
         this.player.setVelocityX(0);
+        // Use standing sprite matching last direction
+        const currentTexture = this.player.texture.key;
+        const isLookingLeft = currentTexture.includes('left');
+        this.player.setTexture(`friar-stand-${isLookingLeft ? 'left' : 'right'}`);
     }
 } 
