@@ -35,6 +35,10 @@ let moveState = {
     right: false
 };
 
+// Track doors and their interaction zones
+let doors = [];
+let currentDoor = null;
+
 function setupMobileControls() {
     // Create invisible touch zones for left and right sides of the screen
     const touchZone = document.createElement('div');
@@ -52,6 +56,12 @@ function setupMobileControls() {
         const screenWidth = window.innerWidth;
         const touchX = touch.clientX;
         const edgeSize = screenWidth * 0.2; // 20% of screen width
+
+        // Check if we're touching a door when we're near one
+        if (currentDoor && touchX > edgeSize && touchX < screenWidth - edgeSize) {
+            showDoorMessage();
+            return;
+        }
 
         if (touchX < edgeSize) {
             moveState.left = true;
@@ -93,7 +103,7 @@ function preload() {
     bgCtx.fillStyle = '#8B4513';
     bgCtx.fillRect(0, backgroundCanvas.height - 50, backgroundCanvas.width, 50);
 
-    // Draw some mission arches
+    // Draw mission arches and doors
     bgCtx.fillStyle = '#DEB887';
     for (let x = 100; x < backgroundCanvas.width; x += 200) {
         // Draw arch
@@ -101,6 +111,17 @@ function preload() {
         bgCtx.beginPath();
         bgCtx.arc(x + 50, 100, 50, Math.PI, 0);
         bgCtx.fill();
+    }
+
+    // Add doors between every third set of arches
+    bgCtx.fillStyle = '#C19A6B';  // Door frame color
+    for (let x = 250; x < backgroundCanvas.width; x += 600) {  // Start at 250 (between first and second arch)
+        // Door frame
+        bgCtx.fillRect(x - 25, backgroundCanvas.height - 150, 50, 100);  // From ground up
+        // Door
+        bgCtx.fillStyle = '#8B4513';  // Door color
+        bgCtx.fillRect(x - 20, backgroundCanvas.height - 145, 40, 90);
+        bgCtx.fillStyle = '#C19A6B';  // Reset to frame color for next door
     }
 
     this.textures.addCanvas('background', backgroundCanvas);
@@ -221,6 +242,36 @@ function preload() {
     });
 }
 
+function showDoorMessage() {
+    // Remove any existing message
+    if (this.doorMessage) {
+        this.doorMessage.destroy();
+    }
+
+    // Show the message
+    this.doorMessage = this.add.text(
+        this.cameras.main.centerX,
+        this.cameras.main.centerY - 50,
+        'You tapped the door!',
+        {
+            fontSize: '24px',
+            fill: '#fff',
+            backgroundColor: '#000',
+            padding: { x: 20, y: 10 }
+        }
+    );
+    this.doorMessage.setOrigin(0.5);
+    this.doorMessage.setScrollFactor(0);
+
+    // Remove the message after 2 seconds
+    this.time.delayedCall(2000, () => {
+        if (this.doorMessage) {
+            this.doorMessage.destroy();
+            this.doorMessage = null;
+        }
+    });
+}
+
 function create() {
     // Create scrolling background
     this.background = this.add.tileSprite(0, 0, 1600, 400, 'background');
@@ -233,6 +284,20 @@ function create() {
     // Create ground platform
     const ground = this.add.rectangle(0, this.cameras.main.height - 50, 1600, 50);
     this.physics.add.existing(ground, true);
+
+    // Create door interaction zones
+    doors = [];
+    for (let x = 250; x < 1600; x += 600) {  // Match door positions (between arches)
+        const doorZone = this.add.rectangle(x, this.cameras.main.height - 100, 60, 120, 0xffff00, 0);
+        this.physics.add.existing(doorZone, true);
+        doors.push(doorZone);
+
+        // Add glow effect
+        const glow = this.add.rectangle(x, this.cameras.main.height - 100, 70, 130, 0xffff00, 0);
+        glow.setStrokeStyle(3, 0xffff00);
+        glow.setVisible(false);
+        doorZone.glowEffect = glow;
+    }
 
     // Wait a short moment to ensure texture is loaded
     this.time.delayedCall(100, () => {
@@ -260,6 +325,14 @@ function create() {
         // Set up camera to follow player
         this.cameras.main.startFollow(this.player);
         this.cameras.main.setBounds(0, 0, 1600, 400);
+
+        // Add overlap detection with door zones
+        doors.forEach(door => {
+            this.physics.add.overlap(this.player, door, () => {
+                currentDoor = door;
+                door.glowEffect.setVisible(true);
+            });
+        });
     });
 
     // Set up mobile controls
@@ -267,7 +340,7 @@ function create() {
 
     // Add touch instructions
     const instructions = this.add.text(10, 10,
-        'Touch edges of screen to move',
+        'Touch edges to move, tap door to enter',
         {
             fontSize: '18px',
             fill: '#000',
@@ -276,6 +349,13 @@ function create() {
         }
     );
     instructions.setScrollFactor(0);
+
+    // Add keyboard interaction for doors
+    this.input.keyboard.on('keydown-SPACE', () => {
+        if (currentDoor) {
+            showDoorMessage.call(this);
+        }
+    });
 }
 
 function update() {
@@ -303,5 +383,23 @@ function update() {
         const currentTexture = this.player.texture.key;
         const isLookingLeft = currentTexture.includes('left');
         this.player.setTexture(`friar-stand-${isLookingLeft ? 'left' : 'right'}`);
+    }
+
+    // Update door glow effects
+    let nearDoor = false;
+    doors.forEach(door => {
+        if (this.physics.overlap(this.player, door)) {
+            nearDoor = true;
+            currentDoor = door;
+            door.glowEffect.setVisible(true);
+            door.glowEffect.x = door.x;
+            door.glowEffect.y = door.y;
+        } else {
+            door.glowEffect.setVisible(false);
+        }
+    });
+
+    if (!nearDoor) {
+        currentDoor = null;
     }
 } 
