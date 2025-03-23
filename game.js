@@ -44,10 +44,18 @@ function setupMobileControls() {
         e.preventDefault();
         const touch = e.touches[0];
         const screenWidth = window.innerWidth;
-        if (touch.clientX < screenWidth / 2) {
+        const touchX = touch.clientX;
+        const edgeSize = screenWidth * 0.2; // 20% of screen width
+
+        if (touchX < edgeSize) {
             moveState.left = true;
-        } else {
+            moveState.right = false;
+        } else if (touchX > screenWidth - edgeSize) {
             moveState.right = true;
+            moveState.left = false;
+        } else {
+            moveState.left = false;
+            moveState.right = false;
         }
     });
 
@@ -187,6 +195,10 @@ function create() {
         
         // Enable input
         this.cursors = this.input.keyboard.createCursorKeys();
+
+        // Set up camera to follow player
+        this.cameras.main.startFollow(this.player);
+        this.cameras.main.setBounds(0, 0, 1600, 400);
     });
 
     // Set up mobile controls
@@ -194,7 +206,7 @@ function create() {
 
     // Add touch instructions
     const instructions = this.add.text(10, 10,
-        'Touch left/right sides of screen to move',
+        'Touch edges of screen to move',
         {
             fontSize: '18px',
             fill: '#000',
