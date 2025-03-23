@@ -1,0 +1,16 @@
+{
+  "name": "mission-game",
+  "version": "1.0.0",
+  "description": "A game about exploring California Missions",
+  "main": "game.js",
+  "scripts": {
+    "start": "http-server",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "phaser": "^3.70.0"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+} 
