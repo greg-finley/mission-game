@@ -14,6 +14,7 @@
             min-height: 100vh;
             background: #333;
             touch-action: none; /* Prevents default touch behaviors */
+            overflow: hidden; /* Prevent scrolling */
         }
         canvas {
             border: 2px solid #666;
@@ -21,39 +22,10 @@
             height: 100vh !important;
             object-fit: contain;
         }
-        #mobile-controls {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: none; /* Hidden by default, shown via JS on mobile */
-            gap: 10px;
-            z-index: 1000;
-        }
-        .control-btn {
-            width: 60px;
-            height: 60px;
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid rgba(255, 255, 255, 0.4);
-            border-radius: 50%;
-            color: white;
-            font-size: 24px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            user-select: none;
-            touch-action: none;
-        }
     </style>
 </head>
 <body>
-    <div id="mobile-controls">
-        <div class="control-btn" id="btn-left">←</div>
-        <div class="control-btn" id="btn-right">→</div>
-        <div class="control-btn" id="btn-up">↑</div>
-        <div class="control-btn" id="btn-down">↓</div>
-    </div>
     <script src="node_modules/phaser/dist/phaser.min.js"></script>
-    <script src="game.js?v=2"></script>
+    <script src="game.js?v=3"></script>
 </body>
 </html> 

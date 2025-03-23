@@ -10,7 +10,7 @@ const config = {
     physics: {
         default: 'arcade',
         arcade: {
-            gravity: { y: 0 },
+            gravity: { y: 300 },  // Add gravity
             debug: false
         }
     },
@@ -26,52 +26,72 @@ const game = new Phaser.Game(config);
 // Track movement state for mobile controls
 let moveState = {
     left: false,
-    right: false,
-    up: false,
-    down: false
+    right: false
 };
 
 function setupMobileControls() {
-    // Only show mobile controls on touch devices
-    if ('ontouchstart' in window) {
-        const controls = document.getElementById('mobile-controls');
-        controls.style.display = 'flex';
+    // Create invisible touch zones for left and right sides of the screen
+    const touchZone = document.createElement('div');
+    touchZone.style.position = 'fixed';
+    touchZone.style.top = '0';
+    touchZone.style.left = '0';
+    touchZone.style.width = '100%';
+    touchZone.style.height = '100%';
+    touchZone.style.zIndex = '1000';
+    document.body.appendChild(touchZone);
 
-        const buttons = {
-            left: document.getElementById('btn-left'),
-            right: document.getElementById('btn-right'),
-            up: document.getElementById('btn-up'),
-            down: document.getElementById('btn-down')
-        };
+    touchZone.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const screenWidth = window.innerWidth;
+        if (touch.clientX < screenWidth / 2) {
+            moveState.left = true;
+        } else {
+            moveState.right = true;
+        }
+    });
 
-        // Helper function to handle button events
-        const handleButton = (direction, isDown) => {
-            moveState[direction] = isDown;
-        };
+    touchZone.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        moveState.left = false;
+        moveState.right = false;
+    });
 
-        // Set up touch events for each button
-        Object.entries(buttons).forEach(([direction, button]) => {
-            button.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                handleButton(direction, true);
-            });
-
-            button.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                handleButton(direction, false);
-            });
-
-            // Handle touch cancel
-            button.addEventListener('touchcancel', (e) => {
-                e.preventDefault();
-                handleButton(direction, false);
-            });
-        });
-    }
+    touchZone.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        moveState.left = false;
+        moveState.right = false;
+    });
 }
 
 function preload() {
-    // Create a more detailed 8-bit friar sprite
+    // Create a simple mission background
+    const backgroundCanvas = document.createElement('canvas');
+    const bgCtx = backgroundCanvas.getContext('2d');
+    backgroundCanvas.width = 1600;  // Wide background for scrolling
+    backgroundCanvas.height = 400;
+
+    // Draw sky
+    bgCtx.fillStyle = '#87CEEB';
+    bgCtx.fillRect(0, 0, backgroundCanvas.width, backgroundCanvas.height);
+
+    // Draw ground
+    bgCtx.fillStyle = '#8B4513';
+    bgCtx.fillRect(0, backgroundCanvas.height - 50, backgroundCanvas.width, 50);
+
+    // Draw some mission arches
+    bgCtx.fillStyle = '#DEB887';
+    for (let x = 100; x < backgroundCanvas.width; x += 200) {
+        // Draw arch
+        bgCtx.fillRect(x, 100, 100, 200);
+        bgCtx.beginPath();
+        bgCtx.arc(x + 50, 100, 50, Math.PI, 0);
+        bgCtx.fill();
+    }
+
+    this.textures.addCanvas('background', backgroundCanvas);
+
+    // Create the friar sprite
     const friarData = [
         '     HHH     ',  // Head
         '    HHHHH    ',
@@ -91,16 +111,13 @@ function preload() {
         '   SS S SS   '   // Sandals
     ];
 
-    // Convert the ASCII art to a pixel data URL
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     canvas.width = 13;
     canvas.height = 16;
 
-    // Clear the canvas first
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Color palette
     const colors = {
         'B': '#4a3728', // Brown robe
         'T': '#8b7355', // Rope belt
@@ -111,7 +128,6 @@ function preload() {
         'S': '#8b7355'  // Sandals
     };
 
-    // Draw the friar
     friarData.forEach((row, y) => {
         row.split('').forEach((pixel, x) => {
             if (pixel !== ' ') {
@@ -121,16 +137,13 @@ function preload() {
         });
     });
 
-    // Force the texture to update
     const base64 = canvas.toDataURL('image/png');
     const key = 'friar';
     
-    // Remove any existing texture with this key
     if (this.textures.exists(key)) {
         this.textures.remove(key);
     }
     
-    // Create a new image and add it to the texture manager
     const image = new Image();
     image.src = base64;
     
@@ -140,36 +153,52 @@ function preload() {
 }
 
 function create() {
-    // Set up mobile controls
-    setupMobileControls();
+    // Create scrolling background
+    this.background = this.add.tileSprite(0, 0, 1600, 400, 'background');
+    this.background.setOrigin(0, 0);
+    this.background.setScrollFactor(0);
+
+    // Set up world bounds
+    this.physics.world.setBounds(0, 0, 1600, 400);
+
+    // Create ground platform
+    const ground = this.add.rectangle(0, this.cameras.main.height - 50, 1600, 50);
+    this.physics.add.existing(ground, true);
 
     // Wait a short moment to ensure texture is loaded
     this.time.delayedCall(100, () => {
-        // Create the friar sprite
-        this.player = this.add.sprite(
-            this.cameras.main.centerX,
-            this.cameras.main.centerY,
+        // Create the friar sprite with physics
+        this.player = this.physics.add.sprite(
+            100,  // Start more to the left
+            this.cameras.main.height - 100,  // Just above ground
             'friar'
         );
         
-        // Scale the sprite to be more visible but consider screen size
+        // Scale the sprite to be more visible
         const scaleFactor = Math.min(
             this.cameras.main.width / 100,
             this.cameras.main.height / 100
         );
         this.player.setScale(scaleFactor);
         
-        // Enable input only after sprite is created
+        // Set up physics properties
+        this.player.setCollideWorldBounds(true);
+        this.physics.add.collider(this.player, ground);
+        
+        // Enable input
         this.cursors = this.input.keyboard.createCursorKeys();
     });
-    
-    // Add some basic instructions - position relative to screen size
+
+    // Set up mobile controls
+    setupMobileControls();
+
+    // Add touch instructions
     const instructions = this.add.text(10, 10,
-        'Use arrow keys or on-screen buttons to move',
+        'Touch left/right sides of screen to move',
         {
             fontSize: '18px',
-            fill: '#fff',
-            backgroundColor: '#000',
+            fill: '#000',
+            backgroundColor: '#fff',
             padding: { x: 10, y: 5 }
         }
     );
@@ -177,42 +206,23 @@ function create() {
 }
 
 function update() {
-    // Only move if player exists
     if (!this.player) return;
     
-    // Handle player movement
-    const speed = 4;
+    const speed = 200;
     
     // Combine keyboard and touch input
     const moveLeft = this.cursors.left.isDown || moveState.left;
     const moveRight = this.cursors.right.isDown || moveState.right;
-    const moveUp = this.cursors.up.isDown || moveState.up;
-    const moveDown = this.cursors.down.isDown || moveState.down;
     
     if (moveLeft) {
-        this.player.x -= speed;
+        this.player.setVelocityX(-speed);
         this.player.setFlipX(true);
-    }
-    if (moveRight) {
-        this.player.x += speed;
+        this.background.tilePositionX -= 2;  // Scroll background
+    } else if (moveRight) {
+        this.player.setVelocityX(speed);
         this.player.setFlipX(false);
+        this.background.tilePositionX += 2;  // Scroll background
+    } else {
+        this.player.setVelocityX(0);
     }
-    if (moveUp) {
-        this.player.y -= speed;
-    }
-    if (moveDown) {
-        this.player.y += speed;
-    }
-
-    // Keep player within bounds
-    this.player.x = Phaser.Math.Clamp(
-        this.player.x,
-        this.player.width / 2,
-        this.cameras.main.width - this.player.width / 2
-    );
-    this.player.y = Phaser.Math.Clamp(
-        this.player.y,
-        this.player.height / 2,
-        this.cameras.main.height - this.player.height / 2
-    );
 } 
