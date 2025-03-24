@@ -1,9 +1,3 @@
-/**
- * Mission Game
- * MIT License - Copyright (c) 2024 Gregory Finley
- * A simple side-scrolling game about exploring California Missions
- */
-
 const config = {
     type: Phaser.AUTO,
     scale: {
