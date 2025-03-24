@@ -110,25 +110,44 @@ function preload() {
 
     // Draw mission arches starting after the left wall
     bgCtx.fillStyle = '#DEB887';
-    for (let i = 0; i < 10; i++) {  // Limited number of arches
-        const x = WALL_WIDTH + 100 + (i * 200);  // Start after wall
-        // Draw arch
-        bgCtx.fillRect(x, 100, 100, 200);
+    const archWidth = 80;   // Slightly smaller arches
+    const doorWidth = 50;   // Door width
+    const spacing = 30;     // Reduced spacing
+    const totalWidth = GAME_WIDTH - (2 * WALL_WIDTH);
+    const setWidth = (archWidth * 2 + doorWidth + spacing * 3);  // Width of one set
+    
+    // Calculate positions for alternating windows and doors
+    for (let i = 0; i < 5; i++) {  // 5 sets of window-door-window
+        const setStart = WALL_WIDTH + (i * setWidth);
+        
+        // First window
+        const window1X = setStart + spacing;
+        bgCtx.fillRect(window1X, 100, archWidth, 200);
         bgCtx.beginPath();
-        bgCtx.arc(x + 50, 100, 50, Math.PI, 0);
+        bgCtx.arc(window1X + archWidth/2, 100, archWidth/2, Math.PI, 0);
         bgCtx.fill();
-    }
 
-    // Add exactly 5 doors
-    bgCtx.fillStyle = '#C19A6B';  // Door frame color
-    for (let i = 0; i < 5; i++) {
-        const x = WALL_WIDTH + 250 + (i * 300);  // Start after wall, evenly spaced
-        // Door frame
-        bgCtx.fillRect(x - 25, backgroundCanvas.height - 150, 50, 100);
         // Door
+        const doorX = window1X + archWidth + spacing;
+        bgCtx.fillStyle = '#C19A6B';  // Door frame color
+        bgCtx.fillRect(doorX - doorWidth/2, backgroundCanvas.height - 200, doorWidth, 200);
         bgCtx.fillStyle = '#8B4513';  // Door color
-        bgCtx.fillRect(x - 20, backgroundCanvas.height - 145, 40, 90);
-        bgCtx.fillStyle = '#C19A6B';  // Reset to frame color for next door
+        bgCtx.fillRect(doorX - (doorWidth/2 - 5), backgroundCanvas.height - 195, doorWidth - 10, 190);
+        
+        // Add door number above the door
+        bgCtx.fillStyle = '#000000';  // Black text
+        bgCtx.font = '24px Arial';
+        bgCtx.textAlign = 'center';
+        bgCtx.fillText((i + 1).toString(), doorX, backgroundCanvas.height - 220);
+        
+        bgCtx.fillStyle = '#DEB887';  // Back to arch color
+
+        // Second window
+        const window2X = doorX + doorWidth/2 + spacing;
+        bgCtx.fillRect(window2X, 100, archWidth, 200);
+        bgCtx.beginPath();
+        bgCtx.arc(window2X + archWidth/2, 100, archWidth/2, Math.PI, 0);
+        bgCtx.fill();
     }
 
     this.textures.addCanvas('background', backgroundCanvas);
@@ -297,16 +316,23 @@ function create() {
 
     // Create door interaction zones
     doors = [];
+    const archWidth = 80;   // Match the preload values
+    const doorWidth = 50;
+    const spacing = 30;
+    const setWidth = (archWidth * 2 + doorWidth + spacing * 3);
+    
     for (let i = 0; i < 5; i++) {
-        const x = WALL_WIDTH + 250 + (i * 300);  // Match door positions from background
-        const doorZone = this.add.rectangle(x, this.cameras.main.height - 100, 60, 120, 0xffff00, 0);
+        const setStart = WALL_WIDTH + (i * setWidth);
+        const doorX = setStart + spacing + archWidth + spacing + doorWidth/2;
+        
+        const doorZone = this.add.rectangle(doorX, this.cameras.main.height - 100, 60, 200, 0xffff00, 0);
         this.physics.add.existing(doorZone, true);
         doorZone.doorNumber = i + 1;
         doors.push(doorZone);
 
         // Add glow effect
-        const glow = this.add.rectangle(x, this.cameras.main.height - 100, 70, 130, 0xffff00, 0);
-        glow.setStrokeStyle(3, 0xffff00);
+        const glow = this.add.rectangle(doorX, this.cameras.main.height - 100, 70, 210, 0xffff00, 0);
+        glow.setStrokeStyle(6, 0xffff00, 1);
         glow.setVisible(false);
         doorZone.glowEffect = glow;
     }
