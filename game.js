@@ -33,6 +33,13 @@ let moveState = {
 let doors = [];
 let currentDoor = null;
 
+// Add game dimensions
+const GAME_WIDTH = 1600;  // Fixed game width
+const GAME_HEIGHT = 400;
+const WALL_WIDTH = 20;
+let rightWall = null;
+let doorsPassed = 0;
+
 function setupMobileControls() {
     // Create invisible touch zones for left and right sides of the screen
     const touchZone = document.createElement('div');
@@ -83,11 +90,11 @@ function setupMobileControls() {
 }
 
 function preload() {
-    // Create a simple mission background
+    // Create a mission background with left wall
     const backgroundCanvas = document.createElement('canvas');
     const bgCtx = backgroundCanvas.getContext('2d');
-    backgroundCanvas.width = 1600;  // Wide background for scrolling
-    backgroundCanvas.height = 400;
+    backgroundCanvas.width = GAME_WIDTH;
+    backgroundCanvas.height = GAME_HEIGHT;
 
     // Draw sky
     bgCtx.fillStyle = '#87CEEB';
@@ -97,9 +104,14 @@ function preload() {
     bgCtx.fillStyle = '#8B4513';
     bgCtx.fillRect(0, backgroundCanvas.height - 50, backgroundCanvas.width, 50);
 
-    // Draw mission arches and doors
+    // Draw left wall
+    bgCtx.fillStyle = '#8B4513';
+    bgCtx.fillRect(0, 0, WALL_WIDTH, backgroundCanvas.height);
+
+    // Draw mission arches starting after the left wall
     bgCtx.fillStyle = '#DEB887';
-    for (let x = 100; x < backgroundCanvas.width; x += 200) {
+    for (let i = 0; i < 10; i++) {  // Limited number of arches
+        const x = WALL_WIDTH + 100 + (i * 200);  // Start after wall
         // Draw arch
         bgCtx.fillRect(x, 100, 100, 200);
         bgCtx.beginPath();
@@ -107,11 +119,12 @@ function preload() {
         bgCtx.fill();
     }
 
-    // Add doors between every third set of arches
+    // Add exactly 5 doors
     bgCtx.fillStyle = '#C19A6B';  // Door frame color
-    for (let x = 250; x < backgroundCanvas.width; x += 600) {  // Start at 250 (between first and second arch)
+    for (let i = 0; i < 5; i++) {
+        const x = WALL_WIDTH + 250 + (i * 300);  // Start after wall, evenly spaced
         // Door frame
-        bgCtx.fillRect(x - 25, backgroundCanvas.height - 150, 50, 100);  // From ground up
+        bgCtx.fillRect(x - 25, backgroundCanvas.height - 150, 50, 100);
         // Door
         bgCtx.fillStyle = '#8B4513';  // Door color
         bgCtx.fillRect(x - 20, backgroundCanvas.height - 145, 40, 90);
@@ -267,23 +280,28 @@ function showDoorMessage() {
 }
 
 function create() {
-    // Create scrolling background
-    this.background = this.add.tileSprite(0, 0, 1600, 400, 'background');
+    // Create static background (no scrolling)
+    this.background = this.add.image(0, 0, 'background');
     this.background.setOrigin(0, 0);
-    this.background.setScrollFactor(0);
 
-    // Set up world bounds
-    this.physics.world.setBounds(0, 0, 1600, 400);
+    // Set up world bounds with left wall
+    this.physics.world.setBounds(WALL_WIDTH, 0, GAME_WIDTH - WALL_WIDTH, GAME_HEIGHT);
 
     // Create ground platform
-    const ground = this.add.rectangle(0, this.cameras.main.height - 50, 1600, 50);
+    const ground = this.add.rectangle(0, this.cameras.main.height - 50, GAME_WIDTH, 50);
     this.physics.add.existing(ground, true);
+
+    // Create left wall with proper collision
+    const leftWall = this.add.rectangle(WALL_WIDTH/2, GAME_HEIGHT/2, WALL_WIDTH, GAME_HEIGHT);
+    this.physics.add.existing(leftWall, true);
 
     // Create door interaction zones
     doors = [];
-    for (let x = 250; x < 1600; x += 600) {  // Match door positions (between arches)
+    for (let i = 0; i < 5; i++) {
+        const x = WALL_WIDTH + 250 + (i * 300);  // Match door positions from background
         const doorZone = this.add.rectangle(x, this.cameras.main.height - 100, 60, 120, 0xffff00, 0);
         this.physics.add.existing(doorZone, true);
+        doorZone.doorNumber = i + 1;
         doors.push(doorZone);
 
         // Add glow effect
@@ -299,7 +317,7 @@ function create() {
         this.player = this.physics.add.sprite(
             100,
             this.cameras.main.height - 100,
-            'friar-stand-right'  // Start facing right
+            'friar-stand-right'
         );
         
         // Scale the sprite to be more visible
@@ -312,7 +330,8 @@ function create() {
         // Set up physics properties
         this.player.setCollideWorldBounds(true);
         this.physics.add.collider(this.player, ground);
-        
+        this.physics.add.collider(this.player, leftWall);  // Add collision with left wall
+
         // Enable input
         this.cursors = this.input.keyboard.createCursorKeys();
 
@@ -363,23 +382,18 @@ function update() {
     
     if (moveLeft) {
         this.player.setVelocityX(-speed);
-        this.background.tilePositionX -= 2;
-        // Use left-facing walking animation
         this.player.setTexture(Math.floor(Date.now() / 150) % 2 === 0 ? 'friar-walk-left' : 'friar-stand-left');
     } else if (moveRight) {
         this.player.setVelocityX(speed);
-        this.background.tilePositionX += 2;
-        // Use right-facing walking animation
         this.player.setTexture(Math.floor(Date.now() / 150) % 2 === 0 ? 'friar-walk-right' : 'friar-stand-right');
     } else {
         this.player.setVelocityX(0);
-        // Use standing sprite matching last direction
         const currentTexture = this.player.texture.key;
         const isLookingLeft = currentTexture.includes('left');
         this.player.setTexture(`friar-stand-${isLookingLeft ? 'left' : 'right'}`);
     }
 
-    // Update door glow effects
+    // Update door glow effects and check for passed doors
     let nearDoor = false;
     doors.forEach(door => {
         if (this.physics.overlap(this.player, door)) {
@@ -388,6 +402,22 @@ function update() {
             door.glowEffect.setVisible(true);
             door.glowEffect.x = door.x;
             door.glowEffect.y = door.y;
+
+            // Check if we've passed this door
+            if (this.player.x > door.x && door.doorNumber > doorsPassed) {
+                doorsPassed = door.doorNumber;
+                
+                // If we've passed the fifth door and haven't created the right wall yet
+                if (doorsPassed === 5 && !rightWall) {
+                    // Create right wall at the last door's position plus some space
+                    const wallX = door.x + 200;
+                    rightWall = this.add.rectangle(wallX, 200, WALL_WIDTH, 400, 0x8B4513);
+                    this.physics.add.existing(rightWall, true);
+                    
+                    // Update world bounds
+                    this.physics.world.setBounds(WALL_WIDTH, 0, wallX + WALL_WIDTH/2, 400);
+                }
+            }
         } else {
             door.glowEffect.setVisible(false);
         }
